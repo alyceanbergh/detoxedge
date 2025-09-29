@@ -7,7 +7,7 @@ import {
   addMinutes, isBefore, isAfter, parseISO, formatISO,
   areIntervalsOverlapping, startOfDay, setHours, setMinutes, setSeconds, isSameDay
 } from "date-fns";
-import { Resend } from "@resend/node";
+import { Resend } from "resend";
 
 /* =========================
    ENV / CONFIG
