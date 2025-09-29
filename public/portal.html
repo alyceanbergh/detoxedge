@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>My Wellness Portal</title>
+<style>
+  body { font-family: system-ui, Arial, sans-serif; max-width: 900px; margin: 24px auto; padding: 0 14px; }
+  .pill { background:#f3f4f6; padding:4px 8px; border-radius:999px; display:inline-block; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+  th, td { border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 14px; }
+  th { background: #f6f6f6; }
+  button { padding: 6px 10px; }
+</style>
+
+<h2>My Portal</h2>
+<div id="who"></div>
+<p>HBOT credits: <span id="credits" class="pill">–</span></p>
+
+<h3>My Bookings</h3>
+<table id="tbl"><thead><tr>
+  <th>Service</th><th>Start</th><th>End</th>
+</tr></thead><tbody></tbody></table>
+
+<script>
+(async function(){
+  const me = await (await fetch("/api/me")).json();
+  if (!me.user) {
+    document.body.innerHTML = "<h2>Please log in from the main booking page first.</h2>";
+    return;
+  }
+  document.getElementById("who").textContent = `Logged in as ${me.user.name || me.user.email}`;
+  document.getElementById("credits").textContent = me.user.hbotCredits ?? 0;
+
+  const my = await (await fetch("/api/my-bookings")).json();
+  const tb = document.querySelector("#tbl tbody"); tb.innerHTML = "";
+  my.bookings.forEach(b=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML = `<td>${b.service}</td><td>${b.startISO}</td><td>${b.endISO}</td>`;
+    tb.appendChild(tr);
+  });
+})();
+</script>

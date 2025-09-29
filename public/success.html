@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8">
+<title>Payment Success</title>
+<body style="font-family:system-ui;max-width:700px;margin:40px auto">
+<h2>Payment received ✔️</h2>
+<p>We’re confirming your booking…</p>
+<pre id="out" style="white-space:pre-wrap;color:#444"></pre>
+<script>
+(async function(){
+  const params=new URLSearchParams(location.search);
+  const sid=params.get("session_id");
+  const r=await fetch("/api/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:sid})});
+  const data=await r.json();
+  const out=document.getElementById("out");
+  if (data.ok) out.textContent = "Booking confirmed! You’ll receive a confirmation email (if enabled).";
+  else out.textContent = "Paid, but confirmation failed: " + (data.error||"Please contact us to reschedule.");
+})();
+</script>
+</body>

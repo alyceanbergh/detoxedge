@@ -1,0 +1,221 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Detox Edge — Book Now</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 1000px; margin: 24px auto; padding: 0 14px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom: 12px;}
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+    .card { border:1px solid #e3e3e3; border-radius:10px; padding:14px; margin:12px 0; }
+    label { font-weight:600; display:block; margin-bottom:6px; }
+    select, input, button { padding:8px 10px; font-size:16px; }
+    .slots { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap:8px; margin-top:10px; }
+    .slot { padding:8px; border:1px solid #ccc; border-radius:6px; cursor:pointer; background:#fff; }
+    .muted { color:#666; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:10px; }
+    .pill { background:#f3f4f6; padding:4px 8px; border-radius:999px; display:inline-block; margin-right:6px; }
+    .right { text-align:right; }
+    hr { border:none; border-top:1px solid #eee; margin: 16px 0; }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h2>Detox Edge — Book Now</h2>
+    <div class="muted">Choose a service or save with a bundle. Availability updates in real time.</div>
+  </div>
+  <div id="authBox">
+    <input id="email" type="email" placeholder="you@example.com" />
+    <input id="name" type="text" placeholder="Your Name" />
+    <button id="loginBtn">Log in</button>
+    <span id="who" class="muted"></span>
+  </div>
+</header>
+
+<div class="card">
+  <h3>Book a Service (pay first)</h3>
+  <div class="row">
+    <div>
+      <label>Service</label>
+      <select id="service"></select>
+    </div>
+    <div>
+      <label>Date</label>
+      <input type="date" id="date" />
+    </div>
+    <div>
+      <label>&nbsp;</label>
+      <button id="check">Check Availability</button>
+    </div>
+    <div>
+      <label>Quoted Price</label>
+      <div id="price" class="pill">$–</div>
+    </div>
+  </div>
+  <div id="slots" class="slots"></div>
+  <div class="row">
+    <div id="selected" class="muted">No time selected</div>
+    <button id="pay" disabled>Pay & Reserve</button>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Bundles (pay first)</h3>
+  <div id="bundles" class="grid"></div>
+</div>
+
+<div class="card">
+  <h3>My Bookings (debug)</h3>
+  <button id="refreshBks">Refresh</button>
+  <pre id="bks" class="muted" style="white-space:pre-wrap"></pre>
+</div>
+
+<script>
+(async function(){
+  // Auth
+  const emailIn = document.getElementById("email");
+  const nameIn  = document.getElementById("name");
+  const loginBtn= document.getElementById("loginBtn");
+  const who     = document.getElementById("who");
+  async function refreshMe(){
+    const me = await (await fetch("/api/me")).json();
+    if (me.user) {
+      who.textContent = `Logged in as ${me.user.name || me.user.email} | HBOT credits: ${me.user.hbotCredits}`;
+      emailIn.style.display = nameIn.style.display = loginBtn.style.display = "none";
+    }
+  }
+  loginBtn.onclick = async ()=>{
+    if (!emailIn.value) { alert("Enter email"); return; }
+    await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:emailIn.value,name:nameIn.value})});
+    await refreshMe();
+  };
+  await refreshMe();
+
+  // Meta
+  const meta = await (await fetch("/api/meta")).json();
+  const serviceSel=document.getElementById("service");
+  const dateInput =document.getElementById("date");
+  const slotsDiv  =document.getElementById("slots");
+  const selectedDiv=document.getElementById("selected");
+  const payBtn=document.getElementById("pay");
+  const pricePill=document.getElementById("price");
+
+  Object.entries(meta.services).forEach(([k,v])=>{
+    const opt=document.createElement("option");
+    opt.value=k; opt.textContent=`${v.name} (${v.duration}m | $${v.price})`;
+    serviceSel.appendChild(opt);
+  });
+  const today=new Date().toISOString().slice(0,10);
+  dateInput.value=today;
+
+  async function quote(){
+    const q = await (await fetch("/api/quote",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({service:serviceSel.value})})).json();
+    pricePill.textContent = q.ok ? `$${q.price}` : "$–";
+  }
+  serviceSel.onchange = quote; await quote();
+
+  let chosen=null;
+  document.getElementById("check").onclick = async ()=>{
+    chosen=null; selectedDiv.textContent="No time selected"; payBtn.disabled=true;
+    slotsDiv.innerHTML="<div class='muted'>Loading...</div>";
+    const svc=serviceSel.value; const date=dateInput.value;
+    const r=await (await fetch(`/api/availability?service=${svc}&date=${date}`)).json();
+    slotsDiv.innerHTML="";
+    if (!r.slots.length) { slotsDiv.innerHTML="<div class='muted'>No open times.</div>"; return; }
+    r.slots.forEach(s=>{
+      const btn=document.createElement("button");
+      btn.className="slot";
+      btn.textContent=new Date(s.startISO).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      btn.onclick=()=>{
+        chosen={service:svc,startISO:s.startISO};
+        selectedDiv.textContent=`${meta.services[svc].name} @ ${new Date(s.startISO).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+        payBtn.disabled=false;
+      };
+      slotsDiv.appendChild(btn);
+    });
+  };
+
+  // Pay-first single
+  payBtn.onclick = async ()=>{
+    if (!chosen) return;
+    const r = await (await fetch("/api/checkout-single",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(chosen)})).json();
+    if (!r.ok) return alert(r.error||"Unable to start checkout");
+    window.location = r.url;
+  };
+
+  // Bundles UI
+  const bundlesDiv=document.getElementById("bundles");
+  function bundleCard(b){
+    const div=document.createElement("div");
+    div.className="card";
+    const svcNames=b.services.map(k=>meta.services[k]?.name||k).join(" + ");
+    div.innerHTML=`
+      <div><strong>${b.label}</strong></div>
+      <div class="muted">${svcNames}</div>
+      <div class="row" style="margin-top:8px;">
+        <div class="pill">$${b.price}</div>
+      </div>
+      <div class="muted" style="margin-top:6px;">Pick date & time for each item.</div>
+      <div class="slots" id="slots-${b.id}"></div>
+      <div class="right"><button id="pay-${b.id}" disabled>Pay & Reserve Bundle</button></div>
+    `;
+    const pickDiv=div.querySelector(`#slots-${b.id}`);
+    const payBtnB=div.querySelector(`#pay-${b.id}`);
+    const picks={};
+
+    b.services.forEach(svcKey=>{
+      const wrap=document.createElement("div");
+      wrap.className="card";
+      wrap.innerHTML=`
+        <label>${meta.services[svcKey]?.name||svcKey}</label>
+        <div class="row">
+          <input type="date" value="${today}" class="bd" />
+          <button class="check">Check</button>
+        </div>
+        <div class="slots list"></div>
+      `;
+      const dateEl=wrap.querySelector(".bd");
+      const listEl=wrap.querySelector(".list");
+      wrap.querySelector(".check").onclick=async ()=>{
+        listEl.innerHTML="<div class='muted'>Loading...</div>";
+        const r=await (await fetch(`/api/availability?service=${svcKey}&date=${dateEl.value}`)).json();
+        listEl.innerHTML="";
+        if (!r.slots.length) { listEl.innerHTML="<div class='muted'>No open times.</div>"; return; }
+        r.slots.forEach(s=>{
+          const btn=document.createElement("button");
+          btn.className="slot";
+          btn.textContent=new Date(s.startISO).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+          btn.onclick=()=>{
+            picks[svcKey]=s.startISO;
+            btn.style.background="#e8ffe8";
+            payBtnB.disabled = b.services.some(k=>!picks[k]);
+          };
+          listEl.appendChild(btn);
+        });
+      };
+      pickDiv.appendChild(wrap);
+    });
+
+    // Pay-first bundle
+    payBtnB.onclick=async ()=>{
+      const selections=b.services.map(k=>({service:k,startISO:picks[k]}));
+      const r=await (await fetch("/api/checkout-bundle",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bundleId:b.id,selections})})).json();
+      if (!r.ok) return alert(r.error||"Unable to start checkout");
+      window.location = r.url;
+    };
+
+    return div;
+  }
+  meta.bundles.forEach(b=>bundlesDiv.appendChild(bundleCard(b)));
+
+  // My bookings (debug)
+  const refreshBks=document.getElementById("refreshBks");
+  const bks=document.getElementById("bks");
+  async function loadBks(){ const r=await (await fetch("/api/bookings")).json(); bks.textContent=JSON.stringify(r.bookings,null,2); }
+  refreshBks.onclick=loadBks; await loadBks();
+})();
+</script>
+</body>
+</html>

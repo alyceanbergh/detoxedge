@@ -1,0 +1,54 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Staff Dashboard</title>
+<style>
+  body { font-family: system-ui, Arial, sans-serif; max-width: 1100px; margin: 24px auto; padding: 0 14px; }
+  .row { display:flex; gap:12px; align-items:center; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+  th, td { border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 14px; }
+  th { background: #f6f6f6; }
+  input, button { padding: 8px; font-size: 14px; }
+</style>
+<h2>Staff Dashboard</h2>
+<div class="row">
+  <input id="tok" placeholder="Admin token" style="width:320px">
+  <button id="go">Load</button>
+</div>
+<pre id="meta" style="white-space:pre-wrap;color:#444;margin-top:12px"></pre>
+
+<h3>Upcoming Bookings</h3>
+<table id="bktbl"><thead><tr>
+  <th>Service</th><th>Start</th><th>End</th><th>Email</th><th>Paid Session</th>
+</tr></thead><tbody></tbody></table>
+
+<h3>Active Holds</h3>
+<table id="holdtbl"><thead><tr>
+  <th>Type</th><th>Service</th><th>Start</th><th>Expires</th><th>Email</th>
+</tr></thead><tbody></tbody></table>
+
+<script>
+const $ = sel => document.querySelector(sel);
+
+$("#go").onclick = async () => {
+  const t = $("#tok").value.trim();
+  if (!t) return alert("Enter token");
+  const meta = await fetch(`/admin/api/overview?token=${encodeURIComponent(t)}`).then(r=>r.json());
+  $("#meta").textContent = JSON.stringify(meta,null,2);
+
+  const bks = await fetch(`/admin/api/bookings?token=${encodeURIComponent(t)}`).then(r=>r.json());
+  const tb = $("#bktbl tbody"); tb.innerHTML="";
+  bks.forEach(b=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML = `<td>${b.service}</td><td>${b.startISO}</td><td>${b.endISO}</td><td>${b.clientEmail||""}</td><td>${b.paidSessionId||""}</td>`;
+    tb.appendChild(tr);
+  });
+
+  const holds = await fetch(`/admin/api/holds?token=${encodeURIComponent(t)}`).then(r=>r.json());
+  const th = $("#holdtbl tbody"); th.innerHTML="";
+  holds.forEach(h=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML = `<td>${h.type}</td><td>${h.service||""}</td><td>${h.startISO||""}</td><td>${h.expireAt}</td><td>${h.email||""}</td>`;
+    th.appendChild(tr);
+  });
+};
+</script>
