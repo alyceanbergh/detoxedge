@@ -9,40 +9,46 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
+  id          String     @id @default(cuid())
+  email       String     @unique
   name        String?
-  hbotCredits Int      @default(0)
-  createdAt   DateTime @default(now())
+  hbotCredits Int        @default(0)
+  createdAt   DateTime   @default(now())
 
-  bookings    Booking[]
+  // Inverse side of relation, named so Prisma can pair it
+  bookings    Booking[]  @relation("UserBookings")
 }
 
 model Booking {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   service       String
-  // We store ISO strings like "2025-09-30T12:34:56" (no timezone) to match your server.js.
   startISO      String
   endISO        String
-  clientEmail   String?
+  clientEmail   String?   // FK to User.email
   paidSessionId String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
+
+  // Owning side of relation; uses clientEmail as foreign key to User.email
+  user          User?     @relation("UserBookings", fields: [clientEmail], references: [email], onDelete: SetNull)
+
+  @@index([clientEmail])
+  @@index([startISO])
 }
 
 model Hold {
-  id        String   @id @default(cuid())
-  type      String        // "single" | "bundle"
-  groupId   String?
-  bundleId  String?
-  service   String?
-  startISO  String?
-  endISO    String?
-  endISOWB  String?
-  email     String?
+  id         String    @id @default(cuid())
+  type       String            // "single" | "bundle"
+  groupId    String?
+  bundleId   String?
+  service    String?
+  startISO   String?
+  endISO     String?
+  endISOWB   String?
+  email      String?
   unitAmount Int?
-  amount    Int?
-  expireAt  DateTime?
-  createdAt DateTime @default(now())
+  amount     Int?
+  expireAt   DateTime?
+  createdAt  DateTime  @default(now())
 
   @@index([service, startISO])
   @@index([expireAt])
