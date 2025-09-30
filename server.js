@@ -1,6 +1,6 @@
 import express from "express";
 import cookieParser from "cookie-parser";
-import { MongoClient } from "mongodb";
++import { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import Stripe from "stripe";
 import {
