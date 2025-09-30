@@ -1,0 +1,49 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  hbotCredits Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  bookings    Booking[]
+}
+
+model Booking {
+  id            String   @id @default(cuid())
+  service       String
+  // We store ISO strings like "2025-09-30T12:34:56" (no timezone) to match your server.js.
+  startISO      String
+  endISO        String
+  clientEmail   String?
+  paidSessionId String?
+  createdAt     DateTime @default(now())
+}
+
+model Hold {
+  id        String   @id @default(cuid())
+  type      String        // "single" | "bundle"
+  groupId   String?
+  bundleId  String?
+  service   String?
+  startISO  String?
+  endISO    String?
+  endISOWB  String?
+  email     String?
+  unitAmount Int?
+  amount    Int?
+  expireAt  DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([service, startISO])
+  @@index([expireAt])
+}
